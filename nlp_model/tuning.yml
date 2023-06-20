@@ -1,0 +1,33 @@
+version: 1.0.0
+experiments:
+  - id: 0
+    name: "Fake News Detection - Tuning"
+    parameters:
+      - name: "learning_rate"
+        type: "float"
+        minValue: 0.0001
+        maxValue: 0.1
+        scalingType: "Logarithmic"
+      - name: "epochs"
+        type: "int"
+        minValue: 3
+        maxValue: 10
+        scalingType: "Linear"
+      - name: "dropout"
+        type: "int"
+        minValue: 3
+        maxValue: 10
+        scalingType: "Linear"
+      - name: "hidden_size"
+        type: "choice"
+        choices: [12, 44]
+    primaryMetric:
+      name: "f1"
+      goal: "maximize"
+    maxTotalTrials: 30
+    maxConcurrentTrials: 4
+    maxDuration: "02:30:00"
+    algorithm: "random"
+    objective: "minimize"
+    earlyStoppingPolicy:
+      patience: 2
