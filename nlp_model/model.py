@@ -2,14 +2,6 @@ import optuna
 import torch
 from transformers import BertModel
 
-param_type_to_suggestion_map = {
-    'int': optuna.trial.suggest_int,
-    'float': optuna.trial.suggest_float,
-    'choice': optuna.trial.suggest_categorical,
-    'loguniform': optuna.trial.suggest_loguniform,
-    'discrete_uniform': optuna.trial.suggest_discrete_uniform
-}
-
 class ModelConstructor:
     '''
     '''
@@ -19,14 +11,12 @@ class ModelConstructor:
         self.experiment_id = config['experiment_id']
         self.experiment_name = config['experiment_name']
         self.parameters = config['parameters']
+        self.suggestions = self._get_suggestions()
 
-
-    def create_model(self, trial: optuna.Trial):
-        pass
-
-    def _get_suggestions(self):
-        fun = param_type_to_suggestion_map[self.parameters['type']]
-
+    def build_model(self, trial: optuna.Trial):
+        model_params = ['dropout', 'hidden_size', 'pretrained_model']
+        self.model = FakeNewsModel(**{param: self.suggestions[param] for param in model_params})
+        return self.model
 
     def save_model(self):
         pass
@@ -35,24 +25,37 @@ class ModelConstructor:
         pass
 
     def train(self, trial: optuna.Trial):
+        model = self.build_model(trial)
         pass
 
     def evaluate(self):
         pass
 
-    def predict(self):
-        pass
-
     def upload_model(self):
         pass
+
+    @staticmethod
+    def map_parameters_to_suggestion(parameters: dict, trial: optuna.Trial):
+        if parameters['type'] == 'choice':
+            return trial.suggest_catrgorical(parameters['name'], parameters['choices'])
+        elif parameters['type'] == 'float' and parameters['scalingType'] == 'Descrete':
+            return trial.suggest_discrete_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'], parameters['q'])
+        elif parameters['type'] == 'float' and parameters['scalingType'] == 'Logarithmic':
+            return trial.suggest_loguniform(parameters['name'], parameters['minValue'], parameters['maxValue'])
+        elif parameters['type'] == 'float' and parameters['scalingType'] == 'Linear':
+            return trial.suggest_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'])
+        elif parameters['type'] == 'int':
+            return trial.suggest_int(parameters['name'], parameters['low'], parameters['high'])
+        else:
+            raise ValueError(f'Invalid parameter type: {parameters["type"]}')
         
 
 
 class FakeNewsModel(torch.nn.module):
-    def __init__(self, pretrained: str, model_id: int, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
+    def __init__(self, pretrained_model: str, model_id: int, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
         self.model_id = model_id
         # define layers
-        self.bert = BertModel.from_pretrained(pretrained)
+        self.bert = BertModel.from_pretrained(pretrained_model)
         self.dropout_1 = torch.nn.Dropout(dropout1)
         self.linear_1 = torch.nn.Linear(768, hidden_size)
         self.dropout_2 = torch.nn.Dropout(dropout2)

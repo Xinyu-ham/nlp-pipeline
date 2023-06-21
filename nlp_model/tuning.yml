@@ -14,13 +14,16 @@ experiments:
         maxValue: 10
         scalingType: "Linear"
       - name: "dropout"
-        type: "int"
-        minValue: 3
-        maxValue: 10
+        type: "float"
+        minValue: 0.1
+        maxValue: 0.5
         scalingType: "Linear"
       - name: "hidden_size"
         type: "choice"
         choices: [12, 44]
+      - name: "pretrained_model"
+        type: "choice"
+        choices: ["distilbert-base-uncased", "bert-base-uncased"]
     primaryMetric:
       name: "f1"
       goal: "maximize"
