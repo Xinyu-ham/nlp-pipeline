@@ -49,10 +49,10 @@ class ModelConstructor:
 
 
 class FakeNewsModel(torch.nn.module):
-    def __init__(self, model_id: int, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
+    def __init__(self, pretrained: str, model_id: int, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
         self.model_id = model_id
         # define layers
-        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.bert = BertModel.from_pretrained(pretrained)
         self.dropout_1 = torch.nn.Dropout(dropout1)
         self.linear_1 = torch.nn.Linear(768, hidden_size)
         self.dropout_2 = torch.nn.Dropout(dropout2)
