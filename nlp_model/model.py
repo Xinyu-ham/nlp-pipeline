@@ -5,9 +5,11 @@ from transformers import BertModel
 class ModelConstructor:
     '''
     '''
-    def __init__(self, config: dict, device: str='cpu'):
+    def __init__(self, config: dict, train_data_url: str, test_data_url: str, device: str='cpu'):
         self.device = device
         self.model = None 
+        self.train_data_url = train_data_url
+        self.test_data_url = test_data_url
         self.experiment_id = config['experiment_id']
         self.experiment_name = config['experiment_name']
         self.parameters = config['parameters']
@@ -26,7 +28,7 @@ class ModelConstructor:
 
     def train(self, trial: optuna.Trial):
         model = self.build_model(trial)
-        pass
+        
 
     def evaluate(self):
         pass
