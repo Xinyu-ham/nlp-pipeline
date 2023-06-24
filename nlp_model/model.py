@@ -1,23 +1,25 @@
 import optuna
 import torch
-from transformers import BertModel
+from torch.utils.data import DataLoader
+from transformers import BertModel, AutoTokenizer
+from .datapipe import NewsDataPipe
 
-class ModelConstructor:
+class Trainer:
     '''
     '''
-    def __init__(self, config: dict, train_data_url: str, test_data_url: str, device: str='cpu'):
+    def __init__(self, config: dict, device: str='cpu'):
         self.device = device
         self.model = None 
-        self.train_data_url = train_data_url
-        self.test_data_url = test_data_url
         self.experiment_id = config['experiment_id']
         self.experiment_name = config['experiment_name']
         self.parameters = config['parameters']
-        self.suggestions = self._get_suggestions()
+        self.suggestions = {}
 
     def build_model(self, trial: optuna.Trial):
+        for parameter in self.parameters:
+            self.suggestions[parameter['name']] = self.map_parameters_to_suggestion(parameter, trial)
         model_params = ['dropout', 'hidden_size', 'pretrained_model']
-        self.model = FakeNewsModel(**{param: self.suggestions[param] for param in model_params})
+        self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
     def save_model(self):
@@ -26,15 +28,68 @@ class ModelConstructor:
     def load_model(self):
         pass
 
-    def train(self, trial: optuna.Trial):
+    def train(self, trial: optuna.Trial, train_url: str, train_length: int, test_url:str, test_len: int):
         model = self.build_model(trial)
+        tokenizer = AutoTokenizer.from_pretrained(self.suggestions['pretrained_model'])
+        train_data = NewsDataPipe(train_url, tokenizer, train_length)
+        test_data = NewsDataPipe(test_url, tokenizer, test_len)
+
+        train_loader = DataLoader(train_data, batch_size=1, shuffle=True)
+        test_loader = DataLoader(test_data, batch_size=2, shuffle=True)
+
+        model.to(self.device)
+        if torch.cuda.device_count() > 1:
+            model = torch.nn.DataParallel(model)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.suggestions['learning_rate'])
+        loss_function = torch.nn.BCELoss()
+
+        for _ in range(self.suggestions['epochs']):
+            self._run_epoch(train_loader, loss_function, optimizer)
         
+        with torch.no_grad():
+            for bert_input, tabular_input, label in test_loader:
+                bert_input = {
+                    'input_ids': bert_input[0].squeeze().to(self.device),
+                    'attention_mask': bert_input[1].squeeze().to(self.device),
+                    'return_dict': False
+                }
+                tabular_input = torch.cat(tabular_input).T.to(self.device)
+                label = label.T.to(self.device)
 
-    def evaluate(self):
-        pass
+                output = model(bert_input, tabular_input)
 
-    def upload_model(self):
-        pass
+                loss = loss_function(output, label.float())
+                validation_loss += loss.item()
+
+                # get acc of signmoid output
+                acc = (output[0].round() == label).sum().item()
+                validation_acc += acc
+        return validation_acc / len(test_loader)
+
+    def _run_epoch(self, train_loader: DataLoader, loss_function, optimizer):
+        for bert_input, tabular_input, label in train_loader:
+            bert_input = {
+                'input_ids': bert_input[0].squeeze().to(self.device),
+                'attention_mask': bert_input[1].squeeze().to(self.device),
+                'return_dict': False
+            }
+            tabular_input = torch.cat(tabular_input).T.to(self.device)
+            label = label.T.to(self.device)
+
+            output = self.model(bert_input, tabular_input)
+
+            loss = loss_function(output, label.float())
+            training_loss += loss.item()
+
+            # get acc of signmoid output
+            acc = (output[0].round() == label).sum().item()
+            training_acc += acc
+
+            self.model.zero_grad()
+            loss.backward()
+            optimizer.step()
+
 
     @staticmethod
     def map_parameters_to_suggestion(parameters: dict, trial: optuna.Trial):

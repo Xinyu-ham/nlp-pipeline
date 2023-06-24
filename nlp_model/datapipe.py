@@ -19,7 +19,7 @@ class NewsDataPipe(IterDataPipe):
         self.num_files = num_files
 
     def __iter__(self):
-        for _, file in self.url_wrapper:
+        for _, file in self.url_wrapper.load_files_by_s3():
             temp = pd.read_csv(file)
             label = torch.from_numpy(temp['outcome'].values)
             # For BERT model
