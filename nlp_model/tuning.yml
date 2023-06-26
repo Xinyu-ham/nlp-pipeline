@@ -13,7 +13,12 @@ experiments:
         minValue: 3
         maxValue: 10
         scalingType: "Linear"
-      - name: "dropout"
+      - name: "dropout1"
+        type: "float"
+        minValue: 0.1
+        maxValue: 0.5
+        scalingType: "Linear"
+      - name: "dropout2"
         type: "float"
         minValue: 0.1
         maxValue: 0.5
@@ -27,7 +32,7 @@ experiments:
     primaryMetric:
       name: "f1"
       goal: "maximize"
-    maxTotalTrials: 30
+    maxTotalTrials: 5
     maxConcurrentTrials: 4
     maxDuration: "02:30:00"
     algorithm: "random"

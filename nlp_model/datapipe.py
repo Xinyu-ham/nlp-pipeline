@@ -14,7 +14,7 @@ class NewsDataPipe(IterDataPipe):
     '''
     def __init__(self, s3_url: str, tokenizer: AutoTokenizer, num_files: int):
         super().__init__()
-        self.url_wrapper = IterableWrapper(s3_url).list_files_by_s3().shuffle().sharding_filter()
+        self.url_wrapper = IterableWrapper([s3_url]).list_files_by_s3().shuffle().sharding_filter()
         self.tokenizer = tokenizer
         self.num_files = num_files
 

@@ -7,18 +7,18 @@ from .datapipe import NewsDataPipe
 class Trainer:
     '''
     '''
-    def __init__(self, config: dict, device: str='cpu'):
+    def __init__(self, config: dict, device):
         self.device = device
         self.model = None 
-        self.experiment_id = config['experiment_id']
-        self.experiment_name = config['experiment_name']
+        self.experiment_id = config['id']
+        self.experiment_name = config['name']
         self.parameters = config['parameters']
         self.suggestions = {}
 
     def build_model(self, trial: optuna.Trial):
         for parameter in self.parameters:
             self.suggestions[parameter['name']] = self.map_parameters_to_suggestion(parameter, trial)
-        model_params = ['dropout', 'hidden_size', 'pretrained_model']
+        model_params = ['dropout1', 'dropout2', 'hidden_size', 'pretrained_model']
         self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
@@ -29,7 +29,7 @@ class Trainer:
         pass
 
     def train(self, trial: optuna.Trial, train_url: str, train_length: int, test_url:str, test_len: int):
-        model = self.build_model(trial)
+        model = self.build_model(trial).to(self.device)
         tokenizer = AutoTokenizer.from_pretrained(self.suggestions['pretrained_model'])
         train_data = NewsDataPipe(train_url, tokenizer, train_length)
         test_data = NewsDataPipe(test_url, tokenizer, test_len)
@@ -37,9 +37,6 @@ class Trainer:
         train_loader = DataLoader(train_data, batch_size=1, shuffle=True)
         test_loader = DataLoader(test_data, batch_size=2, shuffle=True)
 
-        model.to(self.device)
-        if torch.cuda.device_count() > 1:
-            model = torch.nn.DataParallel(model)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=self.suggestions['learning_rate'])
         loss_function = torch.nn.BCELoss()
@@ -68,6 +65,9 @@ class Trainer:
         return validation_acc / len(test_loader)
 
     def _run_epoch(self, train_loader: DataLoader, loss_function, optimizer):
+        training_loss = 0
+        training_acc = 0
+        
         for bert_input, tabular_input, label in train_loader:
             bert_input = {
                 'input_ids': bert_input[0].squeeze().to(self.device),
@@ -94,7 +94,7 @@ class Trainer:
     @staticmethod
     def map_parameters_to_suggestion(parameters: dict, trial: optuna.Trial):
         if parameters['type'] == 'choice':
-            return trial.suggest_catrgorical(parameters['name'], parameters['choices'])
+            return trial.suggest_categorical(parameters['name'], parameters['choices'])
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Descrete':
             return trial.suggest_discrete_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'], parameters['q'])
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Logarithmic':
@@ -102,16 +102,16 @@ class Trainer:
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Linear':
             return trial.suggest_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'])
         elif parameters['type'] == 'int':
-            return trial.suggest_int(parameters['name'], parameters['low'], parameters['high'])
+            return trial.suggest_int(parameters['name'], parameters['minValue'], parameters['maxValue'])
         else:
             raise ValueError(f'Invalid parameter type: {parameters["type"]}')
         
 
 
-class FakeNewsModel(torch.nn.module):
-    def __init__(self, pretrained_model: str, model_id: int, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
-        self.model_id = model_id
+class FakeNewsModel(torch.nn.Module):
+    def __init__(self, pretrained_model: str, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
         # define layers
+        super(FakeNewsModel, self).__init__()
         self.bert = BertModel.from_pretrained(pretrained_model)
         self.dropout_1 = torch.nn.Dropout(dropout1)
         self.linear_1 = torch.nn.Linear(768, hidden_size)
