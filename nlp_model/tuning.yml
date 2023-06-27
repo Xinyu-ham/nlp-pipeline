@@ -11,17 +11,17 @@ experiments:
       - name: "epochs"
         type: "int"
         minValue: 3
-        maxValue: 10
+        maxValue: 7
         scalingType: "Linear"
       - name: "dropout1"
         type: "float"
         minValue: 0.1
-        maxValue: 0.5
+        maxValue: 0.4
         scalingType: "Linear"
       - name: "dropout2"
         type: "float"
         minValue: 0.1
-        maxValue: 0.5
+        maxValue: 0.4
         scalingType: "Linear"
       - name: "hidden_size"
         type: "choice"
@@ -29,13 +29,5 @@ experiments:
       - name: "pretrained_model"
         type: "choice"
         choices: ["distilbert-base-uncased", "bert-base-uncased"]
-    primaryMetric:
-      name: "f1"
-      goal: "maximize"
-    maxTotalTrials: 5
-    maxConcurrentTrials: 4
-    maxDuration: "02:30:00"
-    algorithm: "random"
-    objective: "minimize"
-    earlyStoppingPolicy:
-      patience: 2
+    n_trials: 5
+    objective: "maximize"

@@ -4,6 +4,9 @@ from torch.utils.data import DataLoader
 from transformers import BertModel, AutoTokenizer
 from .datapipe import NewsDataPipe
 
+from transformers import logging
+logging.set_verbosity_error()
+
 class Trainer:
     '''
     '''
@@ -14,6 +17,7 @@ class Trainer:
         self.experiment_name = config['name']
         self.parameters = config['parameters']
         self.suggestions = {}
+        self.epoch = 0
 
     def build_model(self, trial: optuna.Trial):
         for parameter in self.parameters:
@@ -29,21 +33,28 @@ class Trainer:
         pass
 
     def train(self, trial: optuna.Trial, train_url: str, train_length: int, test_url:str, test_len: int):
-        model = self.build_model(trial).to(self.device)
+        self.model = self.build_model(trial).to(self.device)
         tokenizer = AutoTokenizer.from_pretrained(self.suggestions['pretrained_model'])
+
         train_data = NewsDataPipe(train_url, tokenizer, train_length)
         test_data = NewsDataPipe(test_url, tokenizer, test_len)
 
         train_loader = DataLoader(train_data, batch_size=1, shuffle=True)
-        test_loader = DataLoader(test_data, batch_size=2, shuffle=True)
+        test_loader = DataLoader(test_data, batch_size=1, shuffle=True)
 
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.suggestions['learning_rate'])
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.suggestions['learning_rate'])
         loss_function = torch.nn.BCELoss()
 
+        self.epoch = 0
         for _ in range(self.suggestions['epochs']):
             self._run_epoch(train_loader, loss_function, optimizer)
+
         
+        return self._evaluate_validation_set(test_loader)
+
+    def _evaluate_validation_set(self, test_loader: DataLoader):
+        validation_acc = 0
         with torch.no_grad():
             for bert_input, tabular_input, label in test_loader:
                 bert_input = {
@@ -54,11 +65,7 @@ class Trainer:
                 tabular_input = torch.cat(tabular_input).T.to(self.device)
                 label = label.T.to(self.device)
 
-                output = model(bert_input, tabular_input)
-
-                loss = loss_function(output, label.float())
-                validation_loss += loss.item()
-
+                output = self.model(bert_input, tabular_input)
                 # get acc of signmoid output
                 acc = (output[0].round() == label).sum().item()
                 validation_acc += acc
@@ -68,6 +75,7 @@ class Trainer:
         training_loss = 0
         training_acc = 0
         
+
         for bert_input, tabular_input, label in train_loader:
             bert_input = {
                 'input_ids': bert_input[0].squeeze().to(self.device),
@@ -96,11 +104,11 @@ class Trainer:
         if parameters['type'] == 'choice':
             return trial.suggest_categorical(parameters['name'], parameters['choices'])
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Descrete':
-            return trial.suggest_discrete_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'], parameters['q'])
+            return trial.suggest_float(parameters['name'], parameters['minValue'], parameters['maxValue'], step=parameters['q'])
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Logarithmic':
-            return trial.suggest_loguniform(parameters['name'], parameters['minValue'], parameters['maxValue'])
+            return trial.suggest_float(parameters['name'], parameters['minValue'], parameters['maxValue'], log=True)
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Linear':
-            return trial.suggest_uniform(parameters['name'], parameters['minValue'], parameters['maxValue'])
+            return trial.suggest_float(parameters['name'], parameters['minValue'], parameters['maxValue'])
         elif parameters['type'] == 'int':
             return trial.suggest_int(parameters['name'], parameters['minValue'], parameters['maxValue'])
         else:
