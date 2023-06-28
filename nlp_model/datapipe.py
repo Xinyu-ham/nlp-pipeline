@@ -13,7 +13,14 @@ class NewsDataPipe(IterDataPipe):
         num_files (int): Number of files to load
         distributed (bool): Whether to shard the data to different GPUs during distributed training
     '''
-    def __init__(self, s3_url: str, tokenizer: AutoTokenizer, num_files: int, distributed: bool=False):
+    def __init__(self, s3_url: str, tokenizer: AutoTokenizer, num_files: int, distributed: bool=False) -> None:
+        '''
+        Attributes:
+            url_wrapper (IterableWrapper): IterableWrapper object that wraps the S3 URL
+            tokenizer (transformers.PreTrainedTokenizer): Tokenizer to use
+            num_files (int): Number of files to load
+            distributed (bool): Whether to shard the data to different GPUs during distributed training
+        '''
         super().__init__()
         self.url_wrapper = IterableWrapper([s3_url]).list_files_by_s3().shuffle().sharding_filter()
         self.tokenizer = tokenizer
@@ -21,6 +28,12 @@ class NewsDataPipe(IterDataPipe):
         self.distributed = distributed
 
     def __iter__(self):
+        '''
+        Yields:
+            bert_input (list): List of BERT input tensors containing input_ids and attention_mask
+            tabular_input (list): List of tabular input tensors
+            label (torch.Tensor): Label tensor
+        '''
         for i, (_, file) in enumerate(self.url_wrapper.load_files_by_s3()):
             temp = pd.read_csv(file)
             label = torch.from_numpy(temp['outcome'].values)
@@ -43,5 +56,9 @@ class NewsDataPipe(IterDataPipe):
                 yield bert_input, tabular_input, label
 
     def __len__(self):
+        '''
+        Returns:
+            num_files (int): Number of files to load
+        '''
         return self.num_files
     

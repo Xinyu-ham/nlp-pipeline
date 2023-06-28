@@ -236,7 +236,7 @@ class FakeNewsModel(torch.nn.Module):
         '''
         Initializes the model.
         
-        Parameters:
+        Attributes:
             pretrained_model (str): Pretrained transformer model name.
             dropout1 (float): Dropout rate for the first dropout layer.
             linear1 (torch.nn.Linear): Linear layer after the first dropout layer.
