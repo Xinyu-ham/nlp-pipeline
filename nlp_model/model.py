@@ -73,14 +73,14 @@ class Trainer:
         checkpoint = {'epoch': self.epoch, 'optimizer_states': self.optimizer.state_dict()}
         if self.distributed:
             model_states = self.model.module.state_dict()
-            checkpoint['model_states'] = {'.'.join(k.split('.')[1:]):v for k, v in model_states.items()}
+            checkpoint['model_states'] = {'module.' + k:v for k, v in model_states.items()}
         else:
             checkpoint['model_states'] = self.model.state_dict()
 
         if not os.path.exists(location):
             os.makedirs(location)
         torch.save(checkpoint, f'{location}/{self.experiment_id}.pt')
-        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch + 1} - Model saved to {location}/{self.experiment_id}.pt')
+        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {location}/{self.experiment_id}.pt')
 
     def load_model(self, model_path):
         '''
@@ -92,9 +92,9 @@ class Trainer:
         if os.path.exists(model_path):
             checkpoint = torch.load(model_path)
             self.epoch = checkpoint['epoch']
-            self.model = self.model.load_state_dict(checkpoint['model_states'])
+            self.model.load_state_dict(checkpoint['model_states'])
             self.model.eval()
-            self.optimizer = self.optimizer.load_state_dict(checkpoint['optimizer_states'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_states'])
             print(f'[GPU {self.gpu_id}] | Loaded model from {model_path}.')
 
     def train(self, trial: optuna.Trial, train_url: str, train_len: int, test_url:str, test_len: int) -> float:
@@ -129,9 +129,9 @@ class Trainer:
         for _ in range(self.epoch, self.suggestions['epochs']):
             self.load_model(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
             self._run_epoch(train_loader, loss_function)
+            self.epoch += 1
             if int(self.gpu_id) == 0:
                 self.save_model(f'./assets/models/trial{trial.number}')
-            self.epoch += 1
 
         return self._evaluate_validation_set(test_loader)
 
