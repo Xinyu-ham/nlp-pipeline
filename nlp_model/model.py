@@ -72,9 +72,11 @@ class Trainer:
         '''
         checkpoint = {'epoch': self.epoch, 'optimizer_states': self.optimizer.state_dict()}
         if self.distributed:
-            checkpoint['model_states'] = self.model.module.state_dict()
+            model_states = self.model.module.state_dict()
+            checkpoint['model_states'] = {'.'.join(k.split('.')[1:]):v for k, v in model_states.items()}
         else:
             checkpoint['model_states'] = self.model.state_dict()
+
         if not os.path.exists(location):
             os.makedirs(location)
         torch.save(checkpoint, f'{location}/{self.experiment_id}.pt')
@@ -90,7 +92,7 @@ class Trainer:
         if os.path.exists(model_path):
             checkpoint = torch.load(model_path)
             self.epoch = checkpoint['epoch']
-            self.model = self.model.module.load_state_dict(checkpoint['model_states'])
+            self.model = self.model.load_state_dict(checkpoint['model_states'])
             self.model.eval()
             self.optimizer = self.optimizer.load_state_dict(checkpoint['optimizer_states'])
             print(f'[GPU {self.gpu_id}] | Loaded model from {model_path}.')
