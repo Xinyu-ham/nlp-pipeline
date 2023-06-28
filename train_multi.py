@@ -39,18 +39,31 @@ with open(CONFIG_PATH, 'r') as f:
     experiments = yaml.safe_load(f) 
 tuning_config = experiments['experiments'][0]
 
-def train_model():
+def train_model() -> None:
+    '''
+    Train the model with the given config across multiple nodes and GPUs.
+    '''
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if device == 'cuda':
         torch.cuda.empty_cache()
         print('Using GPU..')
     else:
         print('Using CPU..')
+    
     trainer = Trainer(tuning_config, device, tuning_config['id'] + datetime.now().strftime("%Y%m%d%H%M%S"), DISTRIBUTED)
 
-
     print(f'Training on {TRAIN_FILES} batches..')
-    def objective(trial: optuna.Trial):
+
+    def objective(trial: optuna.Trial) -> float:
+        '''
+        Objective function for optuna to optimize.
+
+        Args:
+            trial: optuna.Trial object
+
+        Returns:
+            float: the objective value
+        '''
         return trainer.train(trial, TRAIN_S3_URL, TRAIN_DATASET_SIZE, TEST_S3_URL, TEST_DATASET_SIZE)
     
     study = optuna.create_study(direction=tuning_config['objective'], study_name=tuning_config['name'])
@@ -59,14 +72,13 @@ def train_model():
     print('Number of finished trials: ', len(study.trials))
     print('Best trial:')
     trial = study.best_trial
-
     print('  Value: ', trial.value)
 
 if __name__ == '__main__':
     init_process_group(backend='gloo')
     train_model()
     destroy_process_group()
-    # print(tuning_config)
+
 
 
 
