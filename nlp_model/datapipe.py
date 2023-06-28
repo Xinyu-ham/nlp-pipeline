@@ -1,25 +1,27 @@
 import pandas as pd
-import torch
+import torch, os
 from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
 from transformers import AutoTokenizer
 
 class NewsDataPipe(IterDataPipe):
     '''
-    DataPipe for loading news data from S3
+    DataPipe for loading news data from S3. Has an option to shard the data to different GPUs during distributed training.
 
     Args:
         s3_url (str): S3 URL to load data from
         tokenizer (transformers.PreTrainedTokenizer): Tokenizer to use
         num_files (int): Number of files to load
+        distributed (bool): Whether to shard the data to different GPUs during distributed training
     '''
-    def __init__(self, s3_url: str, tokenizer: AutoTokenizer, num_files: int):
+    def __init__(self, s3_url: str, tokenizer: AutoTokenizer, num_files: int, distributed: bool=False):
         super().__init__()
         self.url_wrapper = IterableWrapper([s3_url]).list_files_by_s3().shuffle().sharding_filter()
         self.tokenizer = tokenizer
         self.num_files = num_files
+        self.distributed = distributed
 
     def __iter__(self):
-        for _, file in self.url_wrapper.load_files_by_s3():
+        for i, (_, file) in enumerate(self.url_wrapper.load_files_by_s3()):
             temp = pd.read_csv(file)
             label = torch.from_numpy(temp['outcome'].values)
             # For BERT model
@@ -30,7 +32,15 @@ class NewsDataPipe(IterDataPipe):
 
             # Tabular features
             tabular_input = [torch.from_numpy(temp[col].values).to(torch.float32).squeeze() for col in temp.columns if col not in ['outcome', 'headlines']]
-            yield bert_input, tabular_input, label
+            if self.distributed:
+                # Sharding each file to different GPU
+                global_rank = int(os.environ['RANK'])
+                world_size = int(os.environ['WORLD_SIZE'])
+                if i % world_size == global_rank:
+                    yield bert_input, tabular_input, label
+            else:
+                # Sharding every file to one GPU
+                yield bert_input, tabular_input, label
 
     def __len__(self):
         return self.num_files

@@ -11,13 +11,14 @@ from nlp_model.model import Trainer
 
 import optuna
 
-import boto3, json, argparse
+from datetime import datetime
+import boto3, json
 
 
 BUCKET_NAME = 'xy-mp-pipeline'
 
 bucket = boto3.resource('s3').Bucket(BUCKET_NAME)
-metadata = json.loads(bucket.Object('data/covid-csv/metadata.json').get()['Body'].read().decode('utf-8'))
+metadata = json.loads(bucket.Object('data/covid-csv-metadata.json').get()['Body'].read().decode('utf-8'))
 
 OUTPUT_PATH = 'data/covid-csv'
 N_SAMPLES = metadata['dataset_size']
@@ -43,7 +44,7 @@ def train_model():
         print('Using GPU..')
     else:
         print('Using CPU..')
-    trainer = Trainer(tuning_config, device)
+    trainer = Trainer(tuning_config, device, tuning_config['id'] + datetime.now().strftime("%Y%m%d%H%M%S"))
 
 
     print(f'Training on {TRAIN_FILES} batches..')

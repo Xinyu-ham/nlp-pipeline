@@ -1,6 +1,6 @@
 version: 1.0.0
 experiments:
-  - id: 0
+  - id: "fake_news"
     name: "Fake News Detection - Tuning"
     parameters:
       - name: "learning_rate"

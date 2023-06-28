@@ -1,7 +1,8 @@
-import optuna
+import optuna, os
 import torch
 from torch.utils.data import DataLoader
 from transformers import BertModel, AutoTokenizer
+from torch.nn.parallel import DistributedDataParallel as DDP
 from .datapipe import NewsDataPipe
 
 from transformers import logging
@@ -9,13 +10,21 @@ logging.set_verbosity_error()
 
 class Trainer:
     '''
+    Trainer class for training the model given a set of hyperparameters. Given an option to train in distributed mode.
     '''
-    def __init__(self, config: dict, device):
+    def __init__(self, config: dict, device: str, study_name: str, distributed: bool=False):
         self.device = device
         self.model = None 
-        self.experiment_id = config['id']
+        self.optimizer = None
+        self.experiment_id = study_name
         self.experiment_name = config['name']
         self.parameters = config['parameters']
+        self.distributed = distributed
+        if distributed:
+            self.gpu_id = os.environ['LOCAL_RANK']
+            self.device = 'cuda:' + self.gpu_id
+        else:
+            self.gpu_id = 0
         self.suggestions = {}
         self.epoch = 0
 
@@ -26,31 +35,48 @@ class Trainer:
         self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
-    def save_model(self):
-        pass
+    def save_model(self, location: str):
+        checkpoint = {'epoch': self.epoch, 'optimizer_states': self.optimizer.state_dict()}
+        if self.distributed:
+            checkpoint['model_states'] = self.model.module.state_dict()
+        else:
+            checkpoint['model_states'] = self.model.state_dict()
+        if not os.path.exists(location):
+            os.makedirs(location)
+        torch.save(checkpoint, f'{location}/{self.experiment_id}.pt')
+        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch + 1} - Model saved to {location}/{self.experiment_id}.pt')
 
-    def load_model(self):
-        pass
+    def load_model(self, model_path):
+        if os.path.exists(model_path):
+            checkpoint = torch.load(model_path)
+            self.epoch = checkpoint['epoch']
+            self.model = self.model.module.load_state_dict(checkpoint['model_states'])
+            self.optimizer = self.optimizer.load_state_dict(checkpoint['optimizer_states'])
+            print(f'[GPU {self.gpu_id}] | Loaded model from {model_path}.')
 
-    def train(self, trial: optuna.Trial, train_url: str, train_length: int, test_url:str, test_len: int):
+    def train(self, trial: optuna.Trial, train_url: str, train_len: int, test_url:str, test_len: int):
         self.model = self.build_model(trial).to(self.device)
+        if self.distributed:
+            self.model = DDP(self.model, device_ids=[self.device])
         tokenizer = AutoTokenizer.from_pretrained(self.suggestions['pretrained_model'])
 
-        train_data = NewsDataPipe(train_url, tokenizer, train_length)
-        test_data = NewsDataPipe(test_url, tokenizer, test_len)
+        train_data = NewsDataPipe(train_url, tokenizer, train_len, self.distributed)
+        test_data = NewsDataPipe(test_url, tokenizer, test_len, self.distributed)
 
         train_loader = DataLoader(train_data, batch_size=1, shuffle=True)
         test_loader = DataLoader(test_data, batch_size=1, shuffle=True)
 
 
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.suggestions['learning_rate'])
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.suggestions['learning_rate'])
         loss_function = torch.nn.BCELoss()
 
-        self.epoch = 0
-        for _ in range(self.suggestions['epochs']):
-            self._run_epoch(train_loader, loss_function, optimizer)
+        for _ in range(self.epoch, self.suggestions['epochs']):
+            self.load_model(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
+            self._run_epoch(train_loader, loss_function, self.optimizer)
+            if int(self.gpu_id) == 0:
+                self.save_model(f'./assets/models/trial{trial.number}')
+            self.epoch += 1
 
-        
         return self._evaluate_validation_set(test_loader)
 
     def _evaluate_validation_set(self, test_loader: DataLoader):
@@ -96,7 +122,7 @@ class Trainer:
 
             self.model.zero_grad()
             loss.backward()
-            optimizer.step()
+            self.optimizer.step()
 
 
     @staticmethod
