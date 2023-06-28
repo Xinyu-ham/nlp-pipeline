@@ -11,8 +11,27 @@ logging.set_verbosity_error()
 class Trainer:
     '''
     Trainer class for training the model given a set of hyperparameters. Given an option to train in distributed mode.
+
+    Args:
+        config (dict): Dictionary containing the hyperparameters to be tuned.
+        device (str): Device to train the model on.
+        study_name (str): Name of the optuna study.
+        distributed (bool, optional): Whether to train in distributed mode. Defaults to False.
     '''
     def __init__(self, config: dict, device: str, study_name: str, distributed: bool=False):
+        '''
+        Attributes:
+            device (str): Device to train the model on.
+            model (FakeNewsModel): Model to be trained.
+            optimizer (torch.optim): Optimizer to be used for training.
+            experiment_id (str): ID of the optuna study.
+            experiment_name (str): Name of the optuna study.
+            parameters (dict): Dictionary containing the hyperparameters to be tuned.
+            distributed (bool): Whether to train in distributed mode.
+            gpu_id (int): ID of the GPU to train on.
+            suggestions (dict): Dictionary containing the hyperparameters to be tuned and their suggested values.
+            epoch (int): Current epoch of training.
+        '''
         self.device = device
         self.model = None 
         self.optimizer = None
@@ -28,14 +47,29 @@ class Trainer:
         self.suggestions = {}
         self.epoch = 0
 
-    def build_model(self, trial: optuna.Trial):
+    def build_model(self, trial: optuna.Trial) -> torch.nn.Module:
+        '''
+        Builds the model given a set of hyperparameters.
+        
+        Args:
+            trial (optuna.Trial): Optuna trial object.
+
+        Returns:
+            torch.nn.Module: Model to be trained.
+        '''
         for parameter in self.parameters:
             self.suggestions[parameter['name']] = self.map_parameters_to_suggestion(parameter, trial)
         model_params = ['dropout1', 'dropout2', 'hidden_size', 'pretrained_model']
         self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
-    def save_model(self, location: str):
+    def save_model(self, location: str) -> None:
+        '''
+        Saves the model to a given location. Saves the current epoch and optimizer state as well.
+
+        Args:
+            location (str): Location to save the model to.
+        '''
         checkpoint = {'epoch': self.epoch, 'optimizer_states': self.optimizer.state_dict()}
         if self.distributed:
             checkpoint['model_states'] = self.model.module.state_dict()
@@ -47,14 +81,34 @@ class Trainer:
         print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch + 1} - Model saved to {location}/{self.experiment_id}.pt')
 
     def load_model(self, model_path):
+        '''
+        Loads the model from a given location. Loads the current epoch and optimizer state as well.
+
+        Args:
+            model_path (str): Location to load the model from.
+        '''
         if os.path.exists(model_path):
             checkpoint = torch.load(model_path)
             self.epoch = checkpoint['epoch']
             self.model = self.model.module.load_state_dict(checkpoint['model_states'])
+            self.model.eval()
             self.optimizer = self.optimizer.load_state_dict(checkpoint['optimizer_states'])
             print(f'[GPU {self.gpu_id}] | Loaded model from {model_path}.')
 
-    def train(self, trial: optuna.Trial, train_url: str, train_len: int, test_url:str, test_len: int):
+    def train(self, trial: optuna.Trial, train_url: str, train_len: int, test_url:str, test_len: int) -> float:
+        '''
+        Trains the model given a set of hyperparameters.
+
+        Args:
+            trial (optuna.Trial): Optuna trial object.
+            train_url (str): AWS S3 URL of the training dataset.
+            train_len (int): Length of the training dataset.
+            test_url (str): AWS S3 URL of the test dataset.
+            test_len (int): Length of the test dataset.
+
+        Returns:
+            float: Accuracy of the model on the test dataset.
+        '''
         self.model = self.build_model(trial).to(self.device)
         if self.distributed:
             self.model = DDP(self.model, device_ids=[self.device])
@@ -72,14 +126,23 @@ class Trainer:
 
         for _ in range(self.epoch, self.suggestions['epochs']):
             self.load_model(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
-            self._run_epoch(train_loader, loss_function, self.optimizer)
+            self._run_epoch(train_loader, loss_function)
             if int(self.gpu_id) == 0:
                 self.save_model(f'./assets/models/trial{trial.number}')
             self.epoch += 1
 
         return self._evaluate_validation_set(test_loader)
 
-    def _evaluate_validation_set(self, test_loader: DataLoader):
+    def _evaluate_validation_set(self, test_loader: DataLoader) -> float:
+        '''
+        Evaluates the model accuracy on the validation set.
+
+        Args:
+            test_loader (DataLoader): PyTorch DataLoader object for the validation set.
+
+        Returns:
+            float: Accuracy of the model on the validation set.
+        '''
         validation_acc = 0
         with torch.no_grad():
             for bert_input, tabular_input, label in test_loader:
@@ -97,7 +160,14 @@ class Trainer:
                 validation_acc += acc
         return validation_acc / len(test_loader)
 
-    def _run_epoch(self, train_loader: DataLoader, loss_function, optimizer):
+    def _run_epoch(self, train_loader: DataLoader, loss_function: torch.nn.Module) -> None:
+        '''
+        Runs a single epoch of training.
+
+        Args:
+            train_loader (DataLoader): PyTorch DataLoader object for the training set.
+            loss_function (torch.nn.Module): PyTorch loss function.
+        '''
         training_loss = 0
         training_acc = 0
         
@@ -127,6 +197,16 @@ class Trainer:
 
     @staticmethod
     def map_parameters_to_suggestion(parameters: dict, trial: optuna.Trial):
+        '''
+        Maps the parameters to the optuna suggestion.
+
+        Args:
+            parameters (dict): Dictionary of parameters.
+            trial (optuna.Trial): Optuna trial object.
+
+        Returns:
+            Any: Optuna suggestion.
+        '''
         if parameters['type'] == 'choice':
             return trial.suggest_categorical(parameters['name'], parameters['choices'])
         elif parameters['type'] == 'float' and parameters['scalingType'] == 'Descrete':
@@ -143,7 +223,29 @@ class Trainer:
 
 
 class FakeNewsModel(torch.nn.Module):
-    def __init__(self, pretrained_model: str, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12):
+    '''
+    A multi-modal network for Covid fake news detection, using a pretrained transformer model and tabular data.
+
+    Args:
+        pretrained_model (str): Pretrained model name.
+        dropout1 (float): Dropout rate for the first dropout layer.
+        dropout2 (float): Dropout rate for the second dropout layer.
+        hidden_size (int): Size of the hidden layer.
+    '''
+    def __init__(self, pretrained_model: str, dropout1: float=0.25, dropout2: float=0.25, hidden_size: int=12) -> None:
+        '''
+        Initializes the model.
+        
+        Parameters:
+            pretrained_model (str): Pretrained transformer model name.
+            dropout1 (float): Dropout rate for the first dropout layer.
+            linear1 (torch.nn.Linear): Linear layer after the first dropout layer.
+            dropout2 (float): Dropout rate for the second dropout layer.
+            linear2 (torch.nn.Linear): Linear layer after the second dropout layer.
+            normalize (torch.nn.functional.normalize): Normalization function.
+            relu (torch.nn.ReLU): ReLU activation function.
+            sigmoid (torch.nn.Sigmoid): Sigmoid activation function.
+        '''
         # define layers
         super(FakeNewsModel, self).__init__()
         self.bert = BertModel.from_pretrained(pretrained_model)
@@ -156,7 +258,17 @@ class FakeNewsModel(torch.nn.Module):
         self.sigmoid = torch.nn.Sigmoid()
 
 
-    def forward(self, bert_input: dict, tabular_input: list):
+    def forward(self, bert_input: dict, tabular_input: list) -> torch.Tensor:
+        '''
+        Forward pass of the model.
+
+        Args:
+            bert_input (dict): Dictionary of input_ids, attention_mask, and return_dict.
+            tabular_input (list): List of tabular data.
+
+        Returns:
+            torch.Tensor: Tensor of logits from sigmoid.
+        '''
         _, pooled_output = self.bert(**bert_input)
         dropout_1_output = self.dropout_1(pooled_output)
         linear_1_output = self.linear_1(dropout_1_output)
