@@ -1,19 +1,11 @@
-import pandas as pd
-
 import torch
-from torch.utils.data import DataLoader
-from torchdata.datapipes.iter import IterableWrapper, IterDataPipe
+import optuna
 from torch.distributed import init_process_group, destroy_process_group
-from transformers import AutoTokenizer
-import yaml
 
-from nlp_model.datapipe import NewsDataPipe
 from nlp_model.model import Trainer
 
-import optuna
-
+import boto3, json, yaml
 from datetime import datetime
-import boto3, json
 
 
 BUCKET_NAME = 'xy-mp-pipeline'
