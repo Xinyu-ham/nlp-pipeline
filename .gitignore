@@ -2,3 +2,4 @@ data/
 test.ipynb
 .ipynb_checkpoints/
 assets/
+__pycache__/
