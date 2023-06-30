@@ -63,14 +63,18 @@ class Trainer:
         self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
-    def save_model(self, location: str) -> None:
+    def save_checkpoint(self, location: str) -> None:
         '''
         Saves the model to a given location. Saves the current epoch and optimizer state as well.
 
         Args:
             location (str): Location to save the model to.
         '''
-        checkpoint = {'epoch': self.epoch, 'optimizer_states': self.optimizer.state_dict()}
+        checkpoint = {
+            'epoch': self.epoch, 
+            'optimizer_states': self.optimizer.state_dict(),
+            'pretrained_model_name': self.suggestions['pretrained_model']
+        }
         if self.distributed:
             model_states = self.model.module.state_dict()
             checkpoint['model_states'] = {'module.' + k:v for k, v in model_states.items()}
@@ -82,7 +86,7 @@ class Trainer:
         torch.save(checkpoint, f'{location}/{self.experiment_id}.pt')
         print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {location}/{self.experiment_id}.pt')
 
-    def load_model(self, model_path):
+    def load_checkpoint(self, model_path):
         '''
         Loads the model from a given location. Loads the current epoch and optimizer state as well.
 
@@ -127,11 +131,11 @@ class Trainer:
         loss_function = torch.nn.BCELoss()
 
         for _ in range(self.epoch, self.suggestions['epochs']):
-            self.load_model(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
+            self.load_checkpoint(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
             self._run_epoch(train_loader, loss_function)
             self.epoch += 1
             if int(self.gpu_id) == 0:
-                self.save_model(f'./assets/models/trial{trial.number}')
+                self.save_checkpoint(f'./assets/models/trial{trial.number}')
 
         return self._evaluate_validation_set(test_loader)
 
