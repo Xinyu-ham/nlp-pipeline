@@ -46,6 +46,7 @@ class Trainer:
             self.gpu_id = 0
         self.suggestions = {}
         self.epoch = 0
+        self.location = './assets/models/' + self.experiment_id
 
     def build_model(self, trial: optuna.Trial) -> torch.nn.Module:
         '''
@@ -63,7 +64,7 @@ class Trainer:
         self.model = FakeNewsModel(**{model_param: self.suggestions[model_param] for model_param in model_params})
         return self.model
 
-    def save_checkpoint(self, location: str) -> None:
+    def save_checkpoint(self, model_path: str) -> None:
         '''
         Saves the model to a given location. Saves the current epoch and optimizer state as well.
 
@@ -73,7 +74,7 @@ class Trainer:
         checkpoint = {
             'epoch': self.epoch, 
             'optimizer_states': self.optimizer.state_dict(),
-            'pretrained_model_name': self.suggestions['pretrained_model']
+            'pretrained_model': self.suggestions['pretrained_model'],
         }
         if self.distributed:
             model_states = self.model.module.state_dict()
@@ -81,10 +82,12 @@ class Trainer:
         else:
             checkpoint['model_states'] = self.model.state_dict()
 
-        if not os.path.exists(location):
-            os.makedirs(location)
-        torch.save(checkpoint, f'{location}/{self.experiment_id}.pt')
-        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {location}/{self.experiment_id}.pt')
+        save_dir = os.path.dirname(model_path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        torch.save(checkpoint, model_path)
+        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {location}')
 
     def load_checkpoint(self, model_path):
         '''
@@ -100,6 +103,7 @@ class Trainer:
             self.model.eval()
             self.optimizer.load_state_dict(checkpoint['optimizer_states'])
             print(f'[GPU {self.gpu_id}] | Loaded model from {model_path}.')
+
 
     def train(self, trial: optuna.Trial, train_url: str, train_len: int, test_url:str, test_len: int) -> float:
         '''
@@ -131,11 +135,11 @@ class Trainer:
         loss_function = torch.nn.BCELoss()
 
         for _ in range(self.epoch, self.suggestions['epochs']):
-            self.load_checkpoint(f'./assets/models/trial{trial.number}/{self.experiment_id}.pt')
+            self.load_checkpoint(f'{self.location}/trial_{trial.number}.pt')
             self._run_epoch(train_loader, loss_function)
             self.epoch += 1
             if int(self.gpu_id) == 0:
-                self.save_checkpoint(f'./assets/models/trial{trial.number}')
+                self.save_checkpoint(f'{self.location}/trial_{trial.number}.pt')
 
         return self._evaluate_validation_set(test_loader)
 
