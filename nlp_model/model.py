@@ -87,7 +87,7 @@ class Trainer:
             os.makedirs(save_dir)
 
         torch.save(checkpoint, model_path)
-        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {location}')
+        print(f'[GPU {self.gpu_id}] | Completed epoch: {self.epoch} - Model saved to {self.location}')
 
     def load_checkpoint(self, model_path):
         '''
@@ -140,7 +140,6 @@ class Trainer:
             self.epoch += 1
             if int(self.gpu_id) == 0:
                 self.save_checkpoint(f'{self.location}/trial_{trial.number}.pt')
-
         return self._evaluate_validation_set(test_loader)
 
     def _evaluate_validation_set(self, test_loader: DataLoader) -> float:

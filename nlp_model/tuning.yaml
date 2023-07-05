@@ -10,8 +10,8 @@ experiments:
         scalingType: "Logarithmic"
       - name: "epochs"
         type: "int"
-        minValue: 3
-        maxValue: 7
+        minValue: 1
+        maxValue: 1
         scalingType: "Linear"
       - name: "dropout1"
         type: "float"
@@ -29,5 +29,5 @@ experiments:
       - name: "pretrained_model"
         type: "choice"
         choices: ["distilbert-base-uncased", "bert-base-uncased"]
-    n_trials: 5
+    n_trials: 3
     objective: "maximize"
