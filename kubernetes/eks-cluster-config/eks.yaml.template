@@ -4,14 +4,21 @@ kind: ClusterConfig
 metadata:
   name: ${CLUSTER_NAME}
   version: "1.27"
-  region: ${REGION}
-
-availabilityZones:
-  - ${AZ1}
-  - ${AZ2}
+  region: ${AWS_REGION}
 
 iam:
   withOIDC: true
+
+kubernetesNetworkConfig:
+  ipFamily: IPv4
+
+addons:
+  - name: vpc-cni
+    version: latest
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
 
 managedNodeGroups:
   - name: trainers
@@ -22,10 +29,14 @@ managedNodeGroups:
     efaEnabled: false
     minSize: 0
     desiredCapacity: ${NODE_COUNT}
-    maxSize: 10
+    maxSize: 6
     volumeSize: 900
     iam:
       withAddonPolicies:
         cloudWatch: true
         autoScaler: true
         ebs: true
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator", "controllerManager"]
