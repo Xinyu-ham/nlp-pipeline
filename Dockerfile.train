@@ -10,3 +10,4 @@ RUN pip3 install -r requirements.txt
 ADD train_multi.py ./train_multi.py
 ADD nlp_model/ ./nlp_model/
 
+CMD ["torchrun", "", "", ""]
