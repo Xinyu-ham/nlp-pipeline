@@ -18,4 +18,4 @@ class Environment:
     CONFIG_PATH = 'nlp_model/tuning.yaml'
     MODEL_S3_PATH = 's3://xy-mp-pipeline/artifects/model/fake_news_model.pt'
     DISTRIBUTED = True
-    MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI', 'http://127.0.0.1:5000')
+    MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI', 'http://0.0.0.0:5000')

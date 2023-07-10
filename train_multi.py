@@ -4,7 +4,7 @@ from optuna.integration.mlflow import MLflowCallback
 from torch.distributed import init_process_group, destroy_process_group
 
 from nlp_model.model import Trainer
-from contants import Environment as E
+from constants import Environment as E
 
 import boto3, json, yaml
 from datetime import datetime
@@ -64,9 +64,6 @@ def train_model() -> None:
     trial = study.best_trial
     print('  Value: ', trial.value)
 
-
-
-    
 
 if __name__ == '__main__':
     init_process_group(backend='gloo')
