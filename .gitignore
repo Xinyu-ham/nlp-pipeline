@@ -4,3 +4,4 @@ test.ipynb
 assets/
 __pycache__/
 mlruns/
+.env
