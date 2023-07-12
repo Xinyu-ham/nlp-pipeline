@@ -9,7 +9,18 @@ services:
             - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
             - AWS_DEFAULT_REGION=${AWS_REGION}
             - MLFLOW_TRACKING_URI= 0.0.0.0:5000
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                      - driver: nvidia
+                        count: all
+                        capabilities: [gpu]
+
+
     mlflow:
         build:
             context: .
             dockerfile: Dockerfile.mlflow
+        ports:
+            - "5000:5000"
