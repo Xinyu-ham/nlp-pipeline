@@ -50,7 +50,7 @@ class NewsDataPipe(IterDataPipe):
                 global_rank = int(os.environ['RANK'])
                 world_size = int(os.environ['WORLD_SIZE'])
                 if i % world_size == global_rank:
-                    if i % 100 == 0:
+                    if i % 1 == 0:
                         print(f'[GPU {global_rank}] |   Beginning batch {i}..')
                     yield bert_input, tabular_input, label
             else:

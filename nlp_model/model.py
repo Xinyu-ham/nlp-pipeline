@@ -132,7 +132,7 @@ class Trainer:
 
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.suggestions['learning_rate'])
-        loss_function = torch.nn.BCELoss()
+        loss_function = torch.nn.BCELoss().to(self.device)
 
         for _ in range(self.epoch, self.suggestions['epochs']):
             self.load_checkpoint(f'{self.location}/trial_{trial.number}.pt')
