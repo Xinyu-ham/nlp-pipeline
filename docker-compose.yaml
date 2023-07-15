@@ -17,7 +17,6 @@ services:
                         count: all
                         capabilities: [gpu]
 
-
     mlflow:
         build:
             context: .

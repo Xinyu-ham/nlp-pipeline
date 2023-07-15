@@ -28,6 +28,6 @@ experiments:
         choices: [12, 44]
       - name: "pretrained_model"
         type: "choice"
-        choices: ["distilbert-base-uncased", "bert-base-uncased"]
+        choices: ["sentence-transformers/all-MiniLM-L6-v2"]
     n_trials: 3
     objective: "maximize"

@@ -44,6 +44,7 @@ class Trainer:
             self.device = 'cuda:' + self.gpu_id
         else:
             self.gpu_id = 0
+        print(f'[GPU {self.gpu_id}] | Allocated memory: {torch.cuda.memory_allocated(self.device)} bytes.')
         self.suggestions = {}
         self.epoch = 0
         self.location = './assets/models/' + self.experiment_id
@@ -135,11 +136,12 @@ class Trainer:
         loss_function = torch.nn.BCELoss().to(self.device)
 
         for _ in range(self.epoch, self.suggestions['epochs']):
-            self.load_checkpoint(f'{self.location}/trial_{trial.number}.pt')
+            # torch.cuda.empty_cache()
+            # self.load_checkpoint(f'{self.location}/trial_{trial.number}.pt')
             self._run_epoch(train_loader, loss_function)
             self.epoch += 1
-            if int(self.gpu_id) == 0:
-                self.save_checkpoint(f'{self.location}/trial_{trial.number}.pt')
+            # if int(self.gpu_id) == 0:
+            #     self.save_checkpoint(f'{self.location}/trial_{trial.number}.pt')
         return self._evaluate_validation_set(test_loader)
 
     def _evaluate_validation_set(self, test_loader: DataLoader) -> float:
@@ -259,7 +261,7 @@ class FakeNewsModel(torch.nn.Module):
         super(FakeNewsModel, self).__init__()
         self.bert = BertModel.from_pretrained(pretrained_model)
         self.dropout_1 = torch.nn.Dropout(dropout1)
-        self.linear_1 = torch.nn.Linear(768, hidden_size)
+        self.linear_1 = torch.nn.Linear(384, hidden_size)
         self.dropout_2 = torch.nn.Dropout(dropout2)
         self.linear_2 = torch.nn.Linear(hidden_size + 20, 1)
         self.normalize = torch.nn.functional.normalize
