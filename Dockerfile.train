@@ -12,4 +12,4 @@ ADD train_multi.py ./train_multi.py
 ADD nlp_model/ ./nlp_model/
 ADD constants.py ./constants.py
 
-CMD ["torchrun", "--standalone", "--nnode=1", "--nproc-per-node=1", "--rdzv-endpoint=0.0.0.0:0", "train_multi.py"]
+CMD ["torchrun", "--nnode=2", "--nproc-per-node=1", "--rdzv-endpoint=0.0.0.0:0", "train_multi.py"]

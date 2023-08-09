@@ -15,7 +15,7 @@ class Environment:
     TEST_DATASET_SIZE = MODEL_METADATA['test_size']
     TRAIN_DATASET_SIZE = MODEL_METADATA['train_size']
     MODEL_OUTPUT_PATH = 'assets/model'
-    CONFIG_PATH = 'nlp_model/tuning.yaml'
+    CONFIG_PATH = 'tuning.yaml'
     MODEL_S3_PATH = 's3://xy-mp-pipeline/artifects/model/fake_news_model.pt'
     DISTRIBUTED = True
     MLFLOW_TRACKING_URI = os.environ.get('MLFLOW_TRACKING_URI', 'http://127.0.0.1:5000')

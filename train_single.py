@@ -22,7 +22,7 @@ TEST_S3_URL = f's3://{BUCKET_NAME}/{OUTPUT_PATH}/testing/'
 TEST_DATASET_SIZE = metadata['test_size']
 TRAIN_DATASET_SIZE = metadata['train_size']
 MODEL_OUTPUT_PATH = 'assets/model'
-CONFIG_PATH = 'nlp_model/tuning.yaml'
+CONFIG_PATH = 'tuning.yaml'
 
 # read yml
 with open(CONFIG_PATH, 'r') as f:
