@@ -45,7 +45,7 @@ sudo mv ./kubectl-node_shell /usr/local/bin/kubectl-node_shell
 # jq
 echo ""
 echo "Installing jq ..."
-sudo yum install -y jq
+sudo apt install -y jq
 
 # yq
 echo ""

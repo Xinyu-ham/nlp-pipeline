@@ -2,7 +2,6 @@
 # get cluster's VPC ID
 VPC_ID=$(aws eks describe-cluster --name $CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text)
 CIDR_BLOCK=$(aws ec2 describe-vpcs --vpc-ids $VPC_ID --query "Vpcs[].CidrBlock" --output text)
-
 # Create and mount SG for EFS
 echo ""
 echo "Creating security group ..."
