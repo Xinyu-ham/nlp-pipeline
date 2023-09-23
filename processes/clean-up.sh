@@ -34,5 +34,4 @@ echo "Deleting NAT Gateways ..."
 NAT_GATEWAYS=$(aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=$VPC_ID --query 'NatGateways[*].NatGatewayId' --output text)
 aws ec2 delete-nat-gateway --nat-gateway-id $NAT_GATEWAYS
 
-
 echo "Exited."
