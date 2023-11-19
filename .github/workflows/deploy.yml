@@ -22,6 +22,7 @@ jobs:
         run: |
           echo "env is ${{ github.ref }}"
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "env_name=production"
             echo "env_name=production" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
             echo "env_name=staging" >> $GITHUB_OUTPUT
