@@ -15,7 +15,7 @@ jobs:
   prepare_env:
     runs-on: ubuntu-latest
     outputs:
-      env_name: ${{ steps.set_env.outputs.env_name }}
+      env_name: ${{ steps.prepare_env.outputs.env_name }}
     steps:
       - name: Prepare environment
         id: prepare_env
